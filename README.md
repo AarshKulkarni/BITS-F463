@@ -34,22 +34,21 @@ The system consists of several interconnected components:
 ##  Project Structure
 
 ```
-├── main.py                 # Main application entry point
-├── shors.py               # Shor's algorithm implementation with Cirq
-├── merchant.html          # Merchant QR code portal interface
-├── user.html             # User payment interface
-├── models/               # Core data models
-│   ├── bank.py           # Bank management system
-│   ├── user.py           # User account model
-│   ├── merchant.py       # Merchant account model
-│   └── blockchain.py     # Blockchain implementation
-├── scripts/              # Network and system scripts
-│   ├── bank_system.py    # Banking server
-│   ├── upi_machine.py    # UPI processing server
-│   └── user_device.py    # Client device simulator
-├── utils/                # Utility functions
-│   └── helpers.py        # Helper functions (hashing, etc.)
-└── tasks/                # Project documentation
+├── shors.py               
+├── merchant.html          
+├── user.html              
+├── models/                
+│   ├── bank.py            
+│   ├── user.py            
+│   ├── merchant.py        
+│   └── blockchain.py     
+├── scripts/               
+│   ├── bank_system.py    
+│   ├── upi_machine.py     
+│   └── user_device.py     
+├── utils/                
+│   └── helpers.py         
+└── tasks/                
 ```
 
 ## Installation
