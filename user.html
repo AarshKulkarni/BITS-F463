@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UPI Banking Interface</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #0066cc;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 12px 20px;
+            width: 100%;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0052a3;
+        }
+
+        .error-message {
+            color: #e53935;
+            margin-top: 15px;
+            text-align: center;
+            display: none;
+        }
+
+        .success-message {
+            color: #43a047;
+            margin-top: 15px;
+            text-align: center;
+            display: none;
+        }
+
+        #login-form,
+        #transaction-form {
+            display: block;
+        }
+
+        #transaction-form {
+            display: none;
+        }
+
+        .logout-btn {
+            background-color: #f44336;
+            margin-top: 20px;
+        }
+
+        .logout-btn:hover {
+            background-color: #d32f2f;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Login Form -->
+        <div id="login-form">
+            <h1>Banking Login</h1>
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" placeholder="Enter your username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Enter your password" required>
+            </div>
+            <button type="button" onclick="login()">Login</button>
+            <div id="login-error" class="error-message"></div>
+        </div>
+
+        <!-- Transaction Form -->
+        <div id="transaction-form">
+            <h1>UPI Payment</h1>
+            <div class="form-group">
+                <label for="mmid">MMID</label>
+                <input type="text" id="mmid" placeholder="Enter MMID" required>
+            </div>
+            <div class="form-group">
+                <label for="pin">PIN</label>
+                <input type="password" id="pin" placeholder="Enter PIN" required>
+            </div>
+            <div class="form-group">
+                <label for="amount">Amount</label>
+                <input type="number" id="amount" placeholder="Enter amount" required>
+            </div>
+            <div class="form-group">
+                <label for="encrypted-mid">Encrypted MID</label>
+                <input type="text" id="encrypted-mid" placeholder="Enter encrypted MID from QR" required>
+            </div>
+            <button type="button" onclick="initiatePayment()">Make Payment</button>
+            <div id="transaction-status" class="success-message"></div>
+            <div id="transaction-error" class="error-message"></div>
+            <button type="button" class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <script>
+        // Function to load user credentials from JSON file
+        async function loadCredentials() {
+            try {
+                const response = await fetch('banks.json');
+                if (!response.ok) {
+                    throw new Error('Could not load banks.json file');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Error loading credentials:', error);
+                document.getElementById('login-error').textContent = 'Failed to load user data. Please try again later.';
+                document.getElementById('login-error').style.display = 'block';
+                return null;
+            }
+        }
+
+        // Login function
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            // Input validation
+            if (!username || !password) {
+                document.getElementById('login-error').textContent = 'Please enter both username and password';
+                document.getElementById('login-error').style.display = 'block';
+                return;
+            }
+
+            const credentials = await loadCredentials();
+            if (!credentials) return;
+
+            // Check if user exists
+            const user = credentials
+                .map(bank => bank.users.find(u => u.name === username && u.password === password))
+                .find(u => u !== undefined);
+
+            if (user) {
+                // Store user info in session storage
+                sessionStorage.setItem('currentUser', JSON.stringify(user));
+
+                // Show transaction form, hide login form
+                document.getElementById('login-form').style.display = 'none';
+                document.getElementById('transaction-form').style.display = 'block';
+
+                // Reset error message
+                document.getElementById('login-error').style.display = 'none';
+            } else {
+                document.getElementById('login-error').textContent = 'Invalid username or password';
+                document.getElementById('login-error').style.display = 'block';
+            }
+        }
+
+        // Function to initiate payment with raw TCP socket communication
+        function initiatePayment() {
+            // Get values from form
+            const mmid = document.getElementById('mmid').value;
+            const pin = document.getElementById('pin').value;
+            const amount = document.getElementById('amount').value;
+            const encryptedMid = document.getElementById('encrypted-mid').value;
+
+            // Input validation
+            if (!mmid || !pin || !amount || !encryptedMid) {
+                document.getElementById('transaction-error').textContent = 'Please fill in all fields';
+                document.getElementById('transaction-error').style.display = 'block';
+                document.getElementById('transaction-status').style.display = 'none';
+                return;
+            }
+
+            // Prepare transaction data that matches the expected Python format
+            const transaction = {
+                mmid: mmid,
+                pin: pin,
+                amount: amount,
+                mid: encryptedMid
+            };
+
+            // Display processing message
+            document.getElementById('transaction-status').textContent = 'Processing payment...';
+            document.getElementById('transaction-status').style.display = 'block';
+            document.getElementById('transaction-error').style.display = 'none';
+
+            // Since browsers can't directly use TCP sockets, we'll use a WebSocket proxy
+            // This assumes you're using a WebSocket server that forwards to your TCP socket
+            // Or alternatively, modify your Python server to accept WebSocket connections
+            const socket = new WebSocket('ws://127.0.0.1:5001');
+
+            socket.onopen = function (e) {
+                console.log("Connection established");
+                // Send the transaction data in exactly the format your Python script expects
+                socket.send(JSON.stringify(transaction));
+            };
+
+            socket.onmessage = function (event) {
+                console.log("Data received from server");
+                let responseData;
+
+                try {
+                    responseData = JSON.parse(event.data);
+                    document.getElementById('transaction-status').textContent = `Transaction Status: ${responseData.status}`;
+                    document.getElementById('transaction-status').style.display = 'block';
+                    document.getElementById('transaction-error').style.display = 'none';
+
+                    // Reset form on success
+                    if (responseData.status === 'Success') {
+                        setTimeout(() => {
+                            document.getElementById('mmid').value = '';
+                            document.getElementById('pin').value = '';
+                            document.getElementById('amount').value = '';
+                            document.getElementById('encrypted-mid').value = '';
+                        }, 3000);
+                    }
+                } catch (e) {
+                    // Handle non-JSON responses
+                    document.getElementById('transaction-status').textContent = `Response: ${event.data}`;
+                    document.getElementById('transaction-status').style.display = 'block';
+                }
+
+                // Close the connection
+                socket.close();
+            };
+
+            socket.onclose = function (event) {
+                if (event.wasClean) {
+                    console.log(`Connection closed cleanly, code=${event.code} reason=${event.reason}`);
+                } else {
+                    console.log('Connection died');
+                    document.getElementById('transaction-error').textContent = 'Connection to server lost';
+                    document.getElementById('transaction-error').style.display = 'block';
+                    document.getElementById('transaction-status').style.display = 'none';
+                }
+            };
+
+            socket.onerror = function (error) {
+                console.log(`Error: ${error.message}`);
+                document.getElementById('transaction-error').textContent = 'Error connecting to server';
+                document.getElementById('transaction-error').style.display = 'block';
+                document.getElementById('transaction-status').style.display = 'none';
+            };
+        }
+
+        // Logout function
+        function logout() {
+            // Clear session storage
+            sessionStorage.removeItem('currentUser');
+
+            // Reset forms
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('mmid').value = '';
+            document.getElementById('pin').value = '';
+            document.getElementById('amount').value = '';
+            document.getElementById('encrypted-mid').value = '';
+
+            // Hide error/success messages
+            document.getElementById('login-error').style.display = 'none';
+            document.getElementById('transaction-error').style.display = 'none';
+            document.getElementById('transaction-status').style.display = 'none';
+
+            // Show login form, hide transaction form
+            document.getElementById('login-form').style.display = 'block';
+            document.getElementById('transaction-form').style.display = 'none';
+        }
+
+        // Check if user is already logged in (on page load)
+        window.onload = function () {
+            const currentUser = sessionStorage.getItem('currentUser');
+            if (currentUser) {
+                document.getElementById('login-form').style.display = 'none';
+                document.getElementById('transaction-form').style.display = 'block';
+            }
+        };
+    </script>
+</body>
+
+</html>
